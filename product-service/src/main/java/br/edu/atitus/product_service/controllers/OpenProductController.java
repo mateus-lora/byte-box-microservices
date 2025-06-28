@@ -72,7 +72,9 @@ public class OpenProductController {
     		@PathVariable String targetCurrency,
     		@PageableDefault(page = 0, size = 5, sort = "description", direction = Direction.ASC)
     		Pageable pageable) throws Exception {
-    	Page<ProductEntity> products = repository.findAll(pageable);
+    	//Page<ProductEntity> products = repository.findAll(pageable);
+    	Page<ProductEntity> products = repository.findByStockGreaterThan(0, pageable);
+
     	for (ProductEntity product : products) {
             applyCurrencyConversion(product, targetCurrency);
     	}
@@ -93,6 +95,10 @@ public class OpenProductController {
         if (product == null) {
             product = repository.findById(idProduct).orElseThrow(() -> new Exception("Product not found"));
 
+            if (product.getStock() <= 0) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Product with ID " + idProduct + " is out of stock or not available.");
+            }
+            
             applyCurrencyConversion(product, targetCurrency);
 
             cacheManager.getCache(nameCache).put(keyCache, product);
@@ -110,7 +116,7 @@ public class OpenProductController {
             @PathVariable String contains,
             @PathVariable String targetCurrency) {
         try {
-            List<ProductEntity> products = repository.findByThemeContainingIgnoreCase(contains);
+            List<ProductEntity> products = repository.findByThemeContainingIgnoreCaseAndStockGreaterThan(contains, 0);
 
             if (products.isEmpty()) {
                 return ResponseEntity.noContent().build();
@@ -129,6 +135,7 @@ public class OpenProductController {
     @GetMapping("/noconverter/{idProduct}")
     public ResponseEntity<ProductEntity> getNoConverter(@PathVariable Long idProduct) throws Exception {
     	var product = repository.findById(idProduct).orElseThrow(() -> new Exception("Produto não encontrado"));
+    	
     	product.setConvertedPrice(-1);
 		product.setEnvironment("Product-service running on Port: " + serverPort);
 		return ResponseEntity.ok(product);
